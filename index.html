@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>시험범위 단어장</title>
+<style>
+:root{--bg:#f6f5f1;--fg:#1f1f1c;--card:#fff;--ac:#2d5be3;--ok:#1a8f4c;--no:#d23b3b;--bd:#ddd9cf}
+@media(prefers-color-scheme:dark){:root{--bg:#161614;--fg:#eceae3;--card:#222220;--ac:#7d9bff;--ok:#4cc27f;--no:#ff7a7a;--bd:#3a3935}}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:var(--bg);color:var(--fg);padding:env(safe-area-inset-top) 14px 40px}
+.w{max-width:560px;margin:0 auto}h1{font-size:20px;margin:16px 0 4px}small{opacity:.65}
+.tabs{display:flex;gap:6px;margin:12px 0;flex-wrap:wrap}
+button,select,input{font:inherit;color:inherit}
+.tabs button,.btn{border:1px solid var(--bd);background:var(--card);padding:9px 13px;border-radius:10px;cursor:pointer}
+.tabs button.on,.btn.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;align-items:center}
+select{padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--card)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:28px 18px;text-align:center;min-height:180px;display:flex;flex-direction:column;justify-content:center;gap:8px;cursor:pointer}
+.big{font-size:30px;font-weight:700;word-break:break-word}.mean{font-size:22px}
+.opt{display:block;width:100%;text-align:left;margin:8px 0;padding:14px;border:1px solid var(--bd);border-radius:12px;background:var(--card);cursor:pointer}
+.opt.ok{background:var(--ok);color:#fff}.opt.no{background:var(--no);color:#fff}
+input.t{width:100%;padding:14px;border:1px solid var(--bd);border-radius:12px;background:var(--card);font-size:18px}
+.bar{height:6px;background:var(--bd);border-radius:3px;margin:10px 0}.bar i{display:block;height:100%;background:var(--ac);border-radius:3px}
+table{width:100%;border-collapse:collapse}td{padding:8px 4px;border-bottom:1px solid var(--bd);vertical-align:top}td:first-child{font-weight:600}
+.src{font-size:12px;opacity:.6}.res{text-align:center;padding:24px 0}
+</style></head><body><div class="w">
+<h1>시험범위 단어장</h1><small id="cnt"></small>
+<div class="tabs" id="tabs"></div>
+<div class="row"><select id="rng"></select><select id="mode"><option value="all">전체 단어</option><option value="wrong">틀린 단어만</option><option value="unk">모르는 단어만</option></select><select id="kind"><option value="">교재+추가 단어</option><option value="b">교재 어휘만</option><option value="x">추가 단어만</option></select></div>
+<div id="main"></div></div>
+<script src="data.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const S=JSON.parse(localStorage.getItem('vocab')||'{"known":{},"wrong":{}}');
+const save=()=>localStorage.setItem('vocab',JSON.stringify(S));
+const shuf=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const lessons=[...new Set(WORDS.flatMap(w=>w.src.map(s=>s.split(' ')[0])))].sort((a,b)=>parseInt(a)-parseInt(b));
+$('#rng').innerHTML='<option value="">전체 범위</option>'+lessons.map(l=>`<option>${l}</option>`).join('');
+$('#cnt').textContent=`총 ${WORDS.length}개 (교재 어휘 ${WORDS.filter(w=>!w.x).length} + 추가 ${WORDS.filter(w=>w.x).length}) · 지정 지문 19개`;
+const tabs=[['card','카드'],['q1','뜻 고르기'],['q2','단어 고르기'],['spell','철자 쓰기'],['list','목록']];
+let tab='card';
+$('#tabs').innerHTML=tabs.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('');
+function pool(){let p=WORDS.filter(w=>!$('#rng').value||w.src.some(s=>s.startsWith($('#rng').value+' ')));
+ const kd=$('#kind').value;if(kd=='b')p=p.filter(w=>!w.x);if(kd=='x')p=p.filter(w=>w.x);const m=$('#mode').value;if(m=='wrong')p=p.filter(w=>S.wrong[w.w]);if(m=='unk')p=p.filter(w=>!S.known[w.w]);return p}
+function go(){document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t==tab));
+ const p=pool();if(!p.length&&tab!='list'){$('#main').innerHTML='<div class="res">해당하는 단어가 없습니다.</div>';return}
+ ({card,q1:()=>quiz(p,1),q2:()=>quiz(p,2),spell:()=>spell(p),list:()=>list(p)})[tab](p)}
+$('#tabs').onclick=e=>{if(e.target.dataset.t){tab=e.target.dataset.t;go()}};
+$('#rng').onchange=$('#mode').onchange=$('#kind').onchange=go;
+function card(p){let q=shuf(p),i=0,flip=false;
+ const draw=()=>{if(i>=q.length){$('#main').innerHTML=`<div class="res"><h2>한 바퀴 완료!</h2><button class="btn p" id="again">다시 섞기</button></div>`;$('#again').onclick=()=>{q=shuf(p);i=0;draw()};return}
+  const w=q[i];$('#main').innerHTML=`<div class="bar"><i style="width:${i/q.length*100}%"></i></div><small>${i+1} / ${q.length}</small>
+  <div class="card" id="c">${flip?`<div class="mean">${w.m}</div><div class="src">${w.src.join(' · ')}</div>`:`<div class="big">${w.w}</div><small>탭하면 뜻 확인</small>`}</div>
+  <div class="row"><button class="btn" id="n">몰라요</button><button class="btn p" id="k">알아요</button></div>`;
+  $('#c').onclick=()=>{flip=!flip;draw()};
+  $('#k').onclick=()=>{S.known[w.w]=1;delete S.wrong[w.w];save();i++;flip=false;draw()};
+  $('#n').onclick=()=>{delete S.known[w.w];S.wrong[w.w]=1;save();i++;flip=false;draw()}};draw()}
+function quiz(p,type){let q=shuf(p).slice(0,20),i=0,sc=0;
+ const draw=()=>{if(i>=q.length){$('#main').innerHTML=`<div class="res"><h2>${sc} / ${q.length}</h2><p>틀린 단어는 '틀린 단어만'에서 복습하세요.</p><button class="btn p" id="again">다시 풀기</button></div>`;$('#again').onclick=()=>quiz(p,type);return}
+  const w=q[i],others=shuf(WORDS.filter(x=>x!==w)).slice(0,4),opts=shuf([w,...others]);
+  $('#main').innerHTML=`<div class="bar"><i style="width:${i/q.length*100}%"></i></div><small>${i+1} / ${q.length} · 정답 ${sc}</small>
+  <div class="card" style="cursor:default"><div class="${type==1?'big':'mean'}">${type==1?w.w:w.m}</div></div>
+  ${opts.map((o,k)=>`<button class="opt" data-k="${k}">${type==1?o.m:o.w}</button>`).join('')}`;
+  $('#main').onclick=e=>{const b=e.target.closest('.opt');if(!b)return;$('#main').onclick=null;
+   const ok=opts[b.dataset.k]===w;if(ok){sc++;delete S.wrong[w.w]}else S.wrong[w.w]=1;save();
+   b.classList.add(ok?'ok':'no');if(!ok)document.querySelectorAll('.opt')[opts.indexOf(w)].classList.add('ok');
+   setTimeout(()=>{i++;draw()},ok?600:1400)}};draw()}
+function spell(p){let q=shuf(p).slice(0,20),i=0,sc=0;
+ const draw=()=>{if(i>=q.length){$('#main').innerHTML=`<div class="res"><h2>${sc} / ${q.length}</h2><button class="btn p" id="again">다시 풀기</button></div>`;$('#again').onclick=()=>spell(p);return}
+  const w=q[i];$('#main').innerHTML=`<div class="bar"><i style="width:${i/q.length*100}%"></i></div><small>${i+1} / ${q.length} · 정답 ${sc}</small>
+  <div class="card" style="cursor:default"><div class="mean">${w.m}</div></div>
+  <div class="row"><input class="t" id="a" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="영어 단어 입력"></div>
+  <div class="row"><button class="btn p" id="go">확인</button></div><div id="fb"></div>`;
+  const a=$('#a');a.focus();let done=false;
+  const chk=()=>{if(done){i++;draw();return}done=true;const ok=a.value.trim().toLowerCase()==w.w.toLowerCase();
+   if(ok){sc++;delete S.wrong[w.w]}else S.wrong[w.w]=1;save();
+   $('#fb').innerHTML=`<p style="color:var(--${ok?'ok':'no'});font-size:18px">${ok?'정답!':'오답 → <b>'+w.w+'</b>'}</p>`;$('#go').textContent='다음'};
+  $('#go').onclick=chk;a.onkeydown=e=>{if(e.key=='Enter')chk()}};draw()}
+function list(p){const k=Object.keys(S.known).length,w=Object.keys(S.wrong).length;
+ $('#main').innerHTML=`<div class="row"><small>암기 ${k} · 오답 ${w}</small><button class="btn" id="rs">기록 초기화</button></div>
+ <table>${p.map(x=>`<tr><td>${x.w}${x.x?' <span class="src">추가</span>':''}${S.known[x.w]?' ✓':''}${S.wrong[x.w]?' ✗':''}</td><td>${x.m}<div class="src">${x.src.join(' · ')}</div></td></tr>`).join('')}</table>`;
+ $('#rs').onclick=()=>{if(confirm('학습 기록을 모두 지울까요?')){S.known={};S.wrong={};save();go()}}}
+go();
+</script></body></html>
